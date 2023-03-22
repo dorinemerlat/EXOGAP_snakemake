@@ -30,10 +30,11 @@ rule install_trinity:
         echo $CONDA_PREFIX > {output.env}
         """
 
+print(config['repetitive_elements'])
 
 rule install_annotation:
     input:
-        lib_embl = config['lib_embl']
+        lib_embl = config['repetitive_elements']['lib_embl']
     output:
         env = 'results/envs_installation/install_annotation.txt'
     conda: 

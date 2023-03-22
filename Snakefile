@@ -28,6 +28,7 @@ import sys
 
 # general paths
 exogap_dir = os.getcwd()
+info_genomes = "config/info_genomes.tsv"
 
 # define which module/pipeline has been launched
 if sys.argv[-1] in ['annotate_repetitive_elements']:
@@ -51,9 +52,7 @@ scripts_dir = exogap_dir + "/workflow/scripts/"
 rules_dir = exogap_dir + "/workflow/rules/"
 include: "%sinstall_environments.smk" % rules_dir
 include: "%scommons.smk" % rules_dir
-
-# modules
-# include: "%sannotate_repetitive_elements.smk" % rules_dir
+include: "%sannotate_repetitive_elements.smk" % rules_dir
 
 
 

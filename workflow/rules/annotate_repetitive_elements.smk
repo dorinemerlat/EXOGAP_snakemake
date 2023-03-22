@@ -12,126 +12,129 @@ def get_repetitive_elements_options(config, launched):
 
 # define options
 opts_repeats = get_repetitive_elements_options(config, launched)
-print(opts_repeats)
         
-# # rules
-# rule run_repeatmodeler:
-#     input:
-#         genome = rules.reformat_genome.output.reformatedGenome,
-#         env = rules.install_repeatmodeler.output.env
-#     output:
-#         repeatsLib = "results/data_sets/repetitive_elements/{specie}/repeatModeler/{specie}-families.fa"
-#     log:
-#         repeatModeler = 'logs/run_repeatmodeler/{specie}_repeatModeler.log'
-#     params:
-#         rmDir = "results/data_sets/repetitive_elements/{specie}/repeatModeler/",
-#         exogap = exogap_dir
-#     threads:
-#         64
-#     conda:
-#         env_repeatmodeler
-#     shell:
-#         """
-#         mkdir -p {params.rmDir}
-#         cd {params.rmDir}
+# rules
+rule run_repeatmodeler:
+    input:
+        genome = rules.reformat_genome.output.reformated_genome,
+        env = rules.install_repeatmodeler.output.env
+    output:
+        repeatsLib = "results/data_sets/repetitive_elements/{specie}/repeatModeler/{specie}-families.fa"
+    log:
+        repeatModeler = 'logs/run_repeatmodeler/{specie}_repeatModeler.log'
+    params:
+        rmDir = "results/data_sets/repetitive_elements/{specie}/repeatModeler/",
+        exogap = exogap_dir
+    threads:
+        64
+    conda:
+        env_repeatmodeler
+    shell:
+        """
+        mkdir -p {params.rmDir}
+        cd {params.rmDir}
 
-#         BuildDatabase -name {wildcards.specie} -engine ncbi {params.exogap}/{input.genome}
+        BuildDatabase -name {wildcards.specie} -engine ncbi {params.exogap}/{input.genome}
 
-#         RepeatModeler -pa {threads} -engine ncbi -database {wildcards.specie} -LTRStruct \
-#             -ninja_dir $CONDA_DEFAULT_ENV/bin 2>&1 {params.exogap}/{log.repeatModeler}
-#         """
-
-
-# rule reformat_repeatmodeler_library:
-#     input:
-#         unreformated = rules.run_repeatmodeler.output.repeatsLib,
-#         env = rules.install_toolbox.output.env,
-#     output:
-#         formated = "results/data_sets/repetitive_elements/{specie}/repeatModeler/{specie}_repetitive_elements_library.fa"
-#     conda: 
-#         env_toolbox
-#     params:
-#         script = "workflow/scripts/renameRepeats.py"
-#     shell:
-#         """
-#         python {params.script} -i {input.unreformated} -o {output.formated} -p repeats
-#         """
+        RepeatModeler -pa {threads} -engine ncbi -database {wildcards.specie} -LTRStruct \
+            -ninja_dir $CONDA_DEFAULT_ENV/bin 2>&1 {params.exogap}/{log.repeatModeler}
+        """
 
 
-# rule concatanate_repeats_libraries:
-#     input:
-#         repeatsLib = lambda wildcards : expand("results/data_sets/repetitive_elements/{specie}/repeatModeler/{specie}_repetitive_elements_library.fa", 
-#             specie = get_species_in_group('{name}'.format(name=wildcards.repeatsLib), config["repetive_elements"]["group_set"])),
-#         phylogeny = 'config/phylogeny.tsv'
-#     output:
-#         repeatsLibGrouped = "results/data_sets/repetitive_elements/{repeatsLib}/concatenation/{repeatsLib}_repetitive_elements_library.fa"
-#     shell:
-#         """
-#         cat {input.repeatsLib} > {output.repeatsLibGrouped}
-#         """
+rule reformat_repeatmodeler_library:
+    input:
+        unreformated = rules.run_repeatmodeler.output.repeatsLib,
+        env = rules.install_toolbox.output.env,
+    output:
+        formated = "results/data_sets/repetitive_elements/{specie}/repeatModeler/{specie}_repetitive_elements_library.fa"
+    conda: 
+        env_toolbox
+    params:
+        script = "workflow/scripts/renameRepeats.py"
+    shell:
+        """
+        python {params.script} -i {input.unreformated} -o {output.formated} -p repeats
+        """
 
 
-# def choice_repeats_library_for_repeatMasker(wildcards):
-#     if opts_repeats['group_set'] == False:
-#         library =  expand("results/data_sets/repetitive_elements/{repeatsLib}/repeatModeler/{specie}_repetitive_elements_library.fa",
-#             specie = wildcards.repeatsLib)
-#     else:
-#         library = "results/data_sets/repetitive_elements/{repeatsLib}/concatenation/{repeatsLib}_repetitive_elements_library.fa"
-#     return library
+rule concatanate_repeats_libraries:
+    input:
+        repeatsLib = lambda wildcards : expand("results/data_sets/repetitive_elements/{specie}/repeatModeler/{specie}_repetitive_elements_library.fa", 
+            specie = get_species_in_group(GENOMES, '{name}'.format(name=wildcards.repeatsLib), opts_repeats['group_set'])),
+        phylogeny = info_genomes
+    output:
+        repeatsLibGrouped = "results/data_sets/repetitive_elements/{repeatsLib}/concatenation/{repeatsLib}_repetitive_elements_library.fa"
+    shell:
+        """
+        cat {input.repeatsLib} > {output.repeatsLibGrouped}
+        """
 
 
-
-# rule split_repetitive_elements:
-#     input: 
-#         repeatsLib = choice_repeats_library_for_repeatMasker,
-#         env = rules.install_toolbox.output.env
-#     output:
-#         known = "results/data_sets/repetitive_elements/{repeatsLib}/split/{repeatsLib}_repetitive_elements_library_known.fa",
-#         unknown = "results/data_sets/repetitive_elements/{repeatsLib}/split/{repeatsLib}_repetitive_elements_library_unknown.fa"
-#     params:
-#         script = "workflow/scripts/sortingRepeats.py"
-#     conda:
-#         env_toolbox
-#     shell:
-#         """
-#         mkdir -p results/{wildcards.repeatsLib}/repetitive_elements/split/
-
-#         python {params.script} -i {input.repeatsLib} -k {output.known} -u {output.unknown}
-#         """
-
-
-def choice_repeats_library_for_repeatMasker(specie):
+def choice_library_to_split(wildcards):
     if opts_repeats['group_set'] == False:
-        return specie
+        library =  expand("results/data_sets/repetitive_elements/{repeatsLib}/repeatModeler/{specie}_repetitive_elements_library.fa",
+            specie = wildcards.repeatsLib)
     else:
-        return get_taxid_in_phylogeny(specie, opts_repeats['group_set'])
-
-
-def choice_genome_for_repeatmasker(wildcards):
-    if wildcards.repeatsIteration == 'repbaseMask':
-        library =  "results/{specie}/reformated_genome/{specie}.fa"
-    elif wildcards.repeatsIteration == 'knownMask':
-        library = "results/data_sets/repetitive_elements/{repeatsLib}/split/{repeatsLib}_repetitive_elements_library_known.fa".format(
-            repeatsLib = choice_repeats_library_for_repeatMasker('{name}'.format(name=wildcards.specie)))
-    elif wildcards.repeatsIteration == 'unknownmask':
-        library = "results/data_sets/repetitive_elements/{repeatsLib}/split/{repeatsLib}_repetitive_elements_library_unknown.fa".format(
-            repeatsLib = choice_repeats_library_for_repeatMasker('{name}'.format(name=wildcards.specie)))
-    print(library)
+        library = "results/data_sets/repetitive_elements/{repeatsLib}/concatenation/{repeatsLib}_repetitive_elements_library.fa"
     return library
 
 
+
+rule split_repetitive_elements:
+    input: 
+        repeatsLib = choice_library_to_split,
+        env = rules.install_toolbox.output.env
+    output:
+        known = "results/data_sets/repetitive_elements/{repeatsLib}/split/{repeatsLib}_repetitive_elements_library_known.fa",
+        unknown = "results/data_sets/repetitive_elements/{repeatsLib}/split/{repeatsLib}_repetitive_elements_library_unknown.fa"
+    params:
+        script = "workflow/scripts/sortingRepeats.py"
+    conda:
+        env_toolbox
+    shell:
+        """
+        mkdir -p results/{wildcards.repeatsLib}/repetitive_elements/split/
+
+        python {params.script} -i {input.repeatsLib} -k {output.known} -u {output.unknown}
+        """
+
+
+
 def choice_library_for_repeatmasker(wildcards):
+    # user's choice to group libraries
+    if opts_repeats['group_set'] == False:
+        repeatsLib = wildcards.specie
+    else:
+        repeatsLib = GENOMES[wildcards.specie][opts_repeats['group_set']]['name']
+        
+    # choice library to use in fuction of the iteration: repbase, the known repetitive elements or the unknown repetitive elements
     if wildcards.repeatsIteration == 'repbaseMask':
-        return config["repetive_elements"]["repBase"]
+        return config["repetitive_elements"]["repBase"]
     elif wildcards.repeatsIteration == 'knownMask':
-        return "results/{specie}/repetitive_elements/repeatMasker/repbaseMask/{specie}_repbaseMask.fa"
+        library = "results/data_sets/repetitive_elements/{repeatsLib}/split/{repeatsLib}_repetitive_elements_library_known.fa".format(
+            repeatsLib = repeatsLib)
     elif wildcards.repeatsIteration == 'unknownmask':
-        return "results/{specie}/repetitive_elements/repeatMasker/knownMask/{specie}_knownMask.fa"
+        library = "results/data_sets/repetitive_elements/{repeatsLib}/split/{repeatsLib}_repetitive_elements_library_unknown.fa".format(
+            repeatsLib = repeatsLib)
+
+    return library
+
+
+def choice_genome_for_repeatmasker(wildcards):
+    # choice the genome to use in function of the iteration
+    if wildcards.repeatsIteration == 'repbaseMask':
+        genome =  "results/{specie}/reformated_genome/{specie}.fa"
+    elif wildcards.repeatsIteration == 'knownMask':
+        genome =  "results/{specie}/repetitive_elements/repeatMasker/repbaseMask/{specie}_repbaseMask.fa"
+    elif wildcards.repeatsIteration == 'unknownmask':
+        genome = "results/{specie}/repetitive_elements/repeatMasker/knownMask/{specie}_knownMask.fa"
+        
+    return genome
 
 
 rule run_repeatmasker:
     input:
-        phylogeny = "config/phylogeny.tsv",
+        phylogeny = info_genomes,
         genome = choice_genome_for_repeatmasker,
         library = choice_library_for_repeatmasker,
         env = rules.install_annotation.output.env
@@ -217,4 +220,4 @@ rule process_repeatmasker:
 
 
 rule annotate_repetitive_elements:
-    input: expand('results/{specie}/repetitive_elements/repeatMasker/finalMask/{specie}_repetitive_elements.fa', specie = SPECIES)
+    input: expand('results/{specie}/repetitive_elements/repeatMasker/finalMask/{specie}_repetitive_elements.fa', specie = GENOMES)
