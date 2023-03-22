@@ -55,6 +55,8 @@ include: "%scommons.smk" % rules_dir
 include: "%sannotate_repetitive_elements.smk" % rules_dir
 
 
+# config file
+configfile: "%s/config/config.yaml" % exogap_dir
 
 # target rule
 rule all:
