@@ -30,8 +30,12 @@ import sys
 exogap_dir = os.getcwd()
 info_genomes = "config/info_genomes.tsv"
 
+# # config file
+# configfile: "%s/config/config.yaml" % exogap_dir
+
+      
 # define which module/pipeline has been launched
-if sys.argv[-1] in ['annotate_repetitive_elements']:
+if sys.argv[-1] in ['annotate_repetitive_elements', 'create_info_genomes']:
   launched = sys.argv[-1]
 else:
   launched = "pipeline"
@@ -47,21 +51,22 @@ env_toolbox = "%stoolbox.yaml" % envs_dir
 # scripts
 scripts_dir = exogap_dir + "/workflow/scripts/"
 
-
 # rules
 rules_dir = exogap_dir + "/workflow/rules/"
 include: "%sinstall_environments.smk" % rules_dir
 include: "%scommons.smk" % rules_dir
-include: "%sannotate_repetitive_elements.smk" % rules_dir
 
+# include others only if "config/info_genomes.tsv" is already created
+if launched != 'create_info_genomes':
+  include: "%sannotate_repetitive_elements.smk" % rules_dir
 
+  # target rule
+  rule all:
+      """
+      Rule to define all output
+      """
+      output: "file.1"
 
-# target rule
-rule all:
-    """
-    Rule to define all output
-    """
-    output: "file.1"
 
 def read_infos_genomes(specie, rank = "Specie"):
     """
